@@ -1,94 +1,101 @@
-// ---------- CADASTRO ----------
-async function registrarBiometria(username) {
-  const publicKey = {
-    challenge: new Uint8Array(32),
-    rp: { name: "Projeto Biometria QR" },
-    user: {
-      id: new Uint8Array(16),
-      name: username,
-      displayName: username
-    },
-    pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-    authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-    timeout: 60000,
-    attestation: "none"
-  };
+let pinAtual = "";
 
-  const credential = await navigator.credentials.create({ publicKey });
-
-  const publicKeyPem = await exportPublicKey(credential.response.getPublicKey());
-  const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-
-  await fetch("/webauthn/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: username,
-      credential: {
-        id: credentialId,
-        publicKey: publicKeyPem
-      }
-    })
-  });
-
-  alert("Biometria cadastrada com sucesso!");
-  window.location.href = "/";
+// Mostra os dígitos digitados
+function addDigit(digit) {
+  if (pinAtual.length < 8) {
+    pinAtual += digit;
+    document.getElementById("pin-display").innerText = "*".repeat(pinAtual.length);
+  }
 }
 
-// ---------- LOGIN ----------
-async function loginBiometria() {
-  const username = document.getElementById("username").value;
-  if (!username) {
-    alert("Digite o usuário para login biométrico");
+function clearPin() {
+  pinAtual = "";
+  document.getElementById("pin-display").innerText = "";
+}
+
+// Login com PIN
+function loginPin() {
+  if (!pinAtual) {
+    alert("Digite o PIN");
     return;
   }
 
-  const resp = await fetch(`/login-bio/${username}`);
-  const options = await resp.json();
-  if (options.error) {
-    alert(options.error);
-    return;
-  }
+  let usuarios = JSON.parse(localStorage.getItem("usuarios") || "[]");
+  let user = usuarios.find(u => u.pin === pinAtual);
 
-  const assertion = await navigator.credentials.get({
-    publicKey: {
-      challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
-      allowCredentials: [{
-        id: Uint8Array.from(atob(options.credential_id), c => c.charCodeAt(0)),
-        type: "public-key"
-      }],
-      userVerification: "required"
-    }
-  });
-
-  const signature = btoa(String.fromCharCode(...new Uint8Array(assertion.response.signature)));
-
-  const verify = await fetch("/verify-bio", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: username, signature: signature })
-  });
-
-  const result = await verify.json();
-  if (result.status === "ok") {
-    window.location.href = "/qr";
+  if (user) {
+    mostrarImagem(user.imagem);
   } else {
-    alert("Falha no login biométrico");
+    alert("PIN inválido!");
+  }
+  clearPin();
+}
+
+// Login com biometria
+async function loginBiometria() {
+  try {
+    const cred = await navigator.credentials.get({ publicKey: { challenge: new Uint8Array([1,2,3,4]) } });
+    let usuarios = JSON.parse(localStorage.getItem("usuarios") || "[]");
+    if (usuarios.length > 0) {
+      mostrarImagem(usuarios[0].imagem); // simplificado: pega o primeiro
+    } else {
+      alert("Nenhum usuário cadastrado!");
+    }
+  } catch (err) {
+    alert("Erro Biometria: " + err);
   }
 }
 
-// ---------- UTILS ----------
-async function exportPublicKey(key) {
-  const spki = await window.crypto.subtle.exportKey("spki", key);
-  const pem = `-----BEGIN PUBLIC KEY-----\n${btoa(String.fromCharCode(...new Uint8Array(spki)))}\n-----END PUBLIC KEY-----`;
-  return pem;
+// Exibir imagem por 4 segundos
+function mostrarImagem(base64Img) {
+  let img = document.createElement("img");
+  img.src = base64Img;
+  img.style.maxWidth = "300px";
+  img.style.display = "block";
+  img.style.margin = "20px auto";
+  
+  document.body.innerHTML = "";
+  document.body.appendChild(img);
+
+  setTimeout(() => {
+    window.location.href = "/";
+  }, 4000);
 }
 
-// ---------- QR AUTO-REDIRECT ----------
-window.onload = function() {
-  if (document.getElementById("qr")) {
-    setTimeout(() => {
-      window.location.href = "/";
-    }, 4000);
+// Cadastro
+function salvarCadastro(e) {
+  e.preventDefault();
+
+  let pin = document.getElementById("pin").value;
+  let imgFile = document.getElementById("imagem").files[0];
+
+  if (!pin || !imgFile) {
+    alert("Preencha todos os campos!");
+    return;
+  }
+
+  let usuarios = JSON.parse(localStorage.getItem("usuarios") || "[]");
+  if (usuarios.find(u => u.pin === pin)) {
+    alert("PIN já cadastrado!");
+    return;
+  }
+
+  let reader = new FileReader();
+  reader.onload = function(event) {
+    usuarios.push({ pin: pin, imagem: event.target.result });
+    localStorage.setItem("usuarios", JSON.stringify(usuarios));
+    alert("Usuário cadastrado com sucesso!");
+    window.location.href = "/";
+  };
+  reader.readAsDataURL(imgFile);
+}
+
+// Cadastrar biometria
+async function cadastrarBiometria() {
+  try {
+    await navigator.credentials.create({ publicKey: { challenge: new Uint8Array([1,2,3,4]) } });
+    alert("Biometria cadastrada (simulada)");
+  } catch (err) {
+    alert("Erro ao cadastrar biometria: " + err);
   }
 }
