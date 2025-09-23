@@ -1,5 +1,10 @@
-Flask==3.0.0
+pip>=25.2
+setuptools>=75.1.0
+wheel
+
+Flask==3.0.3
 Flask-Session==0.5.0
 qrcode==7.4.2
-pillow==10.0.0
-cryptography==41.0.3
+pillow==10.4.0
+cryptography==42.0.8
+gunicorn==23.0.0
