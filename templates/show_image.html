@@ -1,23 +1,13 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="pt-BR">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
+<meta charset="utf-8">
+<title>Exibindo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>body{margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh}img{max-width:90%;max-height:90%;border-radius:10px}</style>
+<script>setTimeout(()=>{window.location.href='/'},4000)</script>
 </head>
 <body>
-  <h2>Cadastro</h2>
-  <form method="POST">
-    <input type="text" name="username" placeholder="Usuário" required><br>
-    <input type="password" name="pin" inputmode="numeric" pattern="[0-9]*" placeholder="PIN" required><br>
-    <button type="submit">Cadastrar</button>
-  </form>
-
-  {% if biometria %}
-    <p>Agora ative a biometria:</p>
-    <button onclick="registrarBiometria('{{ username }}')">Ativar Biometria</button>
-  {% endif %}
-
-  <a href="/">Voltar</a>
+  <img src="{{ imageUrl }}" alt="Imagem do usuário">
 </body>
 </html>
