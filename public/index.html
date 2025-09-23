@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Autenticação Biométrica</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Tela Principal -->
+    <div id="main-screen" class="screen active">
+        <div class="header">
+            <h1>Sistema de Segurança</h1>
+            <p>Digite sua senha numérica</p>
+        </div>
+        
+        <div class="password-display">
+            <div id="password-dots"></div>
+        </div>
+        
+        <div class="keypad">
+            <button class="key" data-number="1">1</button>
+            <button class="key" data-number="2">2</button>
+            <button class="key" data-number="3">3</button>
+            <button class="key" data-number="4">4</button>
+            <button class="key" data-number="5">5</button>
+            <button class="key" data-number="6">6</button>
+            <button class="key" data-number="7">7</button>
+            <button class="key" data-number="8">8</button>
+            <button class="key" data-number="9">9</button>
+            <button class="key clear" data-action="clear">⌫</button>
+            <button class="key" data-number="0">0</button>
+            <button class="key enter" data-action="enter">✓</button>
+        </div>
+        
+        <div class="bottom-actions">
+            <button id="register-btn" class="register-button">
+                <span>👤</span>
+                Cadastrar Usuário
+            </button>
+        </div>
+    </div>
+
+    <!-- Tela de Cadastro -->
+    <div id="register-screen" class="screen">
+        <div class="header">
+            <button id="back-btn" class="back-button">← Voltar</button>
+            <h1>Cadastro de Usuário</h1>
+            <p>Preencha todos os campos obrigatórios</p>
+        </div>
+        
+        <div class="register-form">
+            <div class="form-group">
+                <label>Senha Numérica</label>
+                <div class="password-input">
+                    <div id="register-password-dots"></div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Foto do Usuário</label>
+                <div class="image-upload">
+                    <input type="file" id="image-input" accept="image/*" required>
+                    <div class="upload-area" id="upload-area">
+                        <span class="upload-icon">📷</span>
+                        <span class="upload-text">Clique para selecionar uma foto</span>
+                    </div>
+                    <div id="image-preview" class="image-preview"></div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Biometria</label>
+                <button id="biometric-btn" class="biometric-button" disabled>
+                    <span class="biometric-icon">👆</span>
+                    <span class="biometric-text">Registrar Biometria</span>
+                </button>
+                <div id="biometric-status" class="biometric-status"></div>
+            </div>
+            
+            <button id="save-user-btn" class="save-button" disabled>
+                Salvar Usuário
+            </button>
+        </div>
+        
+        <div class="keypad">
+            <button class="key" data-number="1">1</button>
+            <button class="key" data-number="2">2</button>
+            <button class="key" data-number="3">3</button>
+            <button class="key" data-number="4">4</button>
+            <button class="key" data-number="5">5</button>
+            <button class="key" data-number="6">6</button>
+            <button class="key" data-number="7">7</button>
+            <button class="key" data-number="8">8</button>
+            <button class="key" data-number="9">9</button>
+            <button class="key clear" data-action="clear">⌫</button>
+            <button class="key" data-number="0">0</button>
+            <button class="key enter" data-action="enter">✓</button>
+        </div>
+    </div>
+
+    <!-- Modal de Imagem -->
+    <div id="image-modal" class="modal">
+        <div class="modal-content">
+            <img id="modal-image" src="" alt="Usuário autenticado">
+            <div class="modal-timer">
+                <div class="timer-circle">
+                    <span id="timer-text">4</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Loading -->
+    <div id="loading-modal" class="modal">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p id="loading-text">Processando...</p>
+        </div>
+    </div>
+
+    <!-- Modal de Mensagem -->
+    <div id="message-modal" class="modal">
+        <div class="message-content">
+            <div class="message-icon" id="message-icon"></div>
+            <h3 id="message-title"></h3>
+            <p id="message-text"></p>
+            <button id="message-ok-btn" class="ok-button">OK</button>
+        </div>
+    </div>
+
+    <script src="webauthn.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
