@@ -8,8 +8,9 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
-    overflow: hidden;
+    overflow-y: auto;   /* ✅ agora a tela pode rolar */
     position: relative;
+}
 }
 
 body::before {
@@ -26,10 +27,11 @@ body::before {
 .screen {
     display: none;
     flex-direction: column;
-    height: 100vh; /* Mantém a altura fixa */
+    min-height: 100vh;  /* ✅ permite que o conteúdo ultrapasse a viewport */
     padding: 20px;
     position: relative;
     z-index: 1;
+}
 }
 
 .screen.active {
