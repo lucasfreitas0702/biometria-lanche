@@ -118,24 +118,44 @@ app.post('/api/authenticate', (req, res) => {
       return res.status(401).json({ error: 'Senha incorreta' });
     }
     
-    // Verificar credencial biométrica
-    if (user.credentialId !== credentialId) {
-      return res.status(401).json({ error: 'Biometria não reconhecida' });
-    }
-    
-    // Retornar dados do usuário (incluindo imagem)
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        image: `data:${user.image.contentType};base64,${user.image.data}`
-      }
-    });
-    
-  } catch (error) {
-    console.error('Erro na autenticação:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    window.addEventListener("load", () => {
+  if (window.PublicKeyCredential) {
+    startBiometricLogin();
   }
+});
+
+async function startBiometricLogin() {
+  try {
+    // chamada ao seu backend: /webauthn/auth/options
+    const resp = await fetch("/webauthn/auth/options");
+    const options = await resp.json();
+
+    // converte challenge e ids de credenciais de base64url p/ ArrayBuffer
+    options.publicKey.challenge = base64urlToBuffer(options.publicKey.challenge);
+    options.publicKey.allowCredentials = options.publicKey.allowCredentials.map(cred => ({
+      ...cred,
+      id: base64urlToBuffer(cred.id)
+    }));
+
+    // abre prompt biometria automaticamente
+    const assertion = await navigator.credentials.get({ publicKey: options.publicKey });
+
+    // envia pro backend validar
+    const res = await fetch("/webauthn/auth/finish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assertion: serializeAssertion(assertion) })
+    });
+
+    const data = await res.json();
+    if (data.ok) {
+      // mostrar imagem do usuário
+      document.getElementById("user-image").src = data.imageUrl;
+    }
+  } catch (err) {
+    console.error("Erro na biometria:", err);
+  }
+}
 });
 
 // API para listar usuários (apenas para debug - remover em produção)
