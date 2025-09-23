@@ -40,15 +40,16 @@ body::before {
 
 /* Estilo para o teclado na tela de registro */
 #register-screen .keypad {
-    position: absolute; /* Posição absoluta para o teclado */
+    position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Fundo para o teclado */
-    padding-top: 10px; /* Espaçamento superior */
-    box-shadow: 0 -5px 15px rgba(0,0,0,0.2); /* Sombra para destacar */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding-top: 10px;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.2);
     z-index: 1000;
-    display: none; /* Esconde o teclado por padrão */
+    display: grid; /* ✅ sempre mostra o teclado */
+}
 }
 
 #register-screen.show-keypad .keypad {
