@@ -1,201 +1,166 @@
-import express from "express";
-import session from "express-session";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { Fido2Lib } from "fido2-lib";
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const multer = require('multer');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
-// Configura pastas
-const __dirname = path.resolve();
-const uploadDir = path.join(__dirname, "public", "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// Middleware
+app.use(cors());
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// Upload de imagens
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "_" + file.originalname);
+// Servir arquivos estáticos
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Configuração do multer para upload de imagens
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limite
   },
-});
-const upload = multer({ storage });
-
-// Sessões
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "segredo",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
-
-app.use(express.json());
-app.use(express.static("public"));
-
-// Banco SQLite
-let db;
-(async () => {
-  db = await open({
-    filename: "./database.db",
-    driver: sqlite3.Database,
-  });
-
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS pessoas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      credential_id TEXT UNIQUE,
-      public_key BLOB,
-      sign_count INTEGER DEFAULT 0,
-      imagem TEXT NOT NULL
-    )
-  `);
-})();
-
-// Configuração FIDO2
-const fido = new Fido2Lib({
-  timeout: 60000,
-  rpId: process.env.RP_ID || "biometria-lanche-10.onrender.com",
-  rpName: "Biometria App",
-  challengeSize: 64,
-  attestation: "none",
-  authenticatorSelection: {
-    userVerification: "discouraged",
-  },
-});
-
-// ---------------- ROTAS ----------------
-
-// Cadastro inicial
-app.post("/api/cadastro", upload.single("imagem"), async (req, res) => {
-  if (!req.file) {
-    return res.json({ ok: false, error: "Imagem obrigatória" });
-  }
-  const result = await db.run(
-    "INSERT INTO pessoas (imagem) VALUES (?)",
-    req.file.filename
-  );
-  res.json({ ok: true, id: result.lastID });
-});
-
-// Início do registro WebAuthn
-app.post("/webauthn/register/options", async (req, res) => {
-  const { id } = req.body;
-  if (!id) return res.json({ error: "id obrigatório" });
-
-  const user = {
-    id: Buffer.from(String(id)),
-    name: String(id),
-    displayName: "Usuário " + id,
-  };
-
-  const opts = await fido.attestationOptions();
-  opts.user = user;
-
-  req.session.registerOpts = opts;
-  req.session.userId = id;
-
-  res.json({ publicKey: opts });
-});
-
-// Finalização do registro
-app.post("/webauthn/register/finish", async (req, res) => {
-  try {
-    const { id, att } = req.body;
-    const state = req.session.registerOpts;
-    if (!state) return res.json({ error: "state inválido" });
-
-    const attRes = {
-      rawId: Buffer.from(att.rawId, "base64url"),
-      response: {
-        attestationObject: Buffer.from(
-          att.response.attestationObject,
-          "base64url"
-        ),
-        clientDataJSON: Buffer.from(att.response.clientDataJSON, "base64url"),
-      },
-    };
-
-    const reg = await fido.attestationResult(attRes, state);
-
-    const credId = att.rawId;
-    const pubKey = reg.authnrData.get("credentialPublicKeyPem");
-    const signCount = reg.authnrData.get("signCount");
-
-    await db.run(
-      "UPDATE pessoas SET credential_id=?, public_key=?, sign_count=? WHERE id=?",
-      credId,
-      pubKey,
-      signCount,
-      id
-    );
-
-    delete req.session.registerOpts;
-    res.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: "Falha no registro" });
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos de imagem são permitidos!'), false);
+    }
   }
 });
 
-// Início da autenticação
-app.get("/webauthn/auth/options", async (req, res) => {
-  const rows = await db.all("SELECT credential_id FROM pessoas WHERE credential_id IS NOT NULL");
-  if (rows.length === 0) return res.json({ error: "Nenhuma credencial cadastrada" });
+// Simulação de banco de dados em memória (para desenvolvimento)
+// Em produção, você deve usar um banco de dados real
+let users = [];
 
-  const allowCredentials = rows.map(r => ({
-    type: "public-key",
-    id: r.credential_id,
-  }));
-
-  const opts = await fido.assertionOptions();
-  opts.allowCredentials = allowCredentials;
-
-  req.session.authOpts = opts;
-  res.json({ publicKey: opts });
+// Rota principal
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Finalização da autenticação
-app.post("/webauthn/auth/finish", async (req, res) => {
+// API para verificar se uma senha já existe
+app.post('/api/check-password', (req, res) => {
+  const { password } = req.body;
+  
+  if (!password) {
+    return res.status(400).json({ error: 'Senha é obrigatória' });
+  }
+  
+  const exists = users.some(user => user.password === password);
+  res.json({ exists });
+});
+
+// API para cadastrar usuário
+app.post('/api/register', upload.single('image'), (req, res) => {
   try {
-    const { assertion } = req.body;
-    const state = req.session.authOpts;
-    if (!state) return res.json({ error: "state inválido" });
-
-    const credId = assertion.rawId;
-
-    const row = await db.get("SELECT * FROM pessoas WHERE credential_id=?", credId);
-    if (!row) return res.json({ ok: false, error: "Credencial não encontrada" });
-
-    const assRes = {
-      rawId: Buffer.from(assertion.rawId, "base64url"),
-      response: {
-        authenticatorData: Buffer.from(assertion.response.authenticatorData, "base64url"),
-        clientDataJSON: Buffer.from(assertion.response.clientDataJSON, "base64url"),
-        signature: Buffer.from(assertion.response.signature, "base64url"),
-        userHandle: assertion.response.userHandle
-          ? Buffer.from(assertion.response.userHandle, "base64url")
-          : null,
+    const { password, credentialId, publicKey } = req.body;
+    const image = req.file;
+    
+    if (!password || !credentialId || !publicKey || !image) {
+      return res.status(400).json({ 
+        error: 'Todos os campos são obrigatórios: senha, credencial biométrica e imagem' 
+      });
+    }
+    
+    // Verificar se a senha já existe
+    const passwordExists = users.some(user => user.password === password);
+    if (passwordExists) {
+      return res.status(400).json({ 
+        error: 'Esta senha numérica já está em uso. Escolha outra.' 
+      });
+    }
+    
+    // Criar novo usuário
+    const newUser = {
+      id: uuidv4(),
+      password: password,
+      credentialId: credentialId,
+      publicKey: publicKey,
+      image: {
+        data: image.buffer.toString('base64'),
+        contentType: image.mimetype
       },
+      createdAt: new Date().toISOString()
     };
-
-    await fido.assertionResult(assRes, state, {
-      credentialPublicKey: row.public_key,
-      counter: row.sign_count,
+    
+    users.push(newUser);
+    
+    res.json({ 
+      success: true, 
+      message: 'Usuário cadastrado com sucesso!',
+      userId: newUser.id 
     });
-
-    res.json({ ok: true, imageUrl: "/uploads/" + row.imagem });
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: "Falha na autenticação" });
+    
+  } catch (error) {
+    console.error('Erro no cadastro:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
-// ---------------------------------------
-
-app.listen(PORT, () => {
-  console.log("Servidor rodando na porta " + PORT);
+// API para autenticar usuário
+app.post('/api/authenticate', (req, res) => {
+  try {
+    const { password, credentialId } = req.body;
+    
+    if (!password || !credentialId) {
+      return res.status(400).json({ 
+        error: 'Senha e credencial biométrica são obrigatórias' 
+      });
+    }
+    
+    // Encontrar usuário pela senha
+    const user = users.find(u => u.password === password);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Senha incorreta' });
+    }
+    
+    // Verificar credencial biométrica
+    if (user.credentialId !== credentialId) {
+      return res.status(401).json({ error: 'Biometria não reconhecida' });
+    }
+    
+    // Retornar dados do usuário (incluindo imagem)
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        image: `data:${user.image.contentType};base64,${user.image.data}`
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erro na autenticação:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
 });
+
+// API para listar usuários (apenas para debug - remover em produção)
+app.get('/api/users', (req, res) => {
+  const userList = users.map(user => ({
+    id: user.id,
+    password: user.password,
+    createdAt: user.createdAt
+  }));
+  res.json(userList);
+});
+
+// Middleware de tratamento de erros
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'Arquivo muito grande. Máximo 5MB.' });
+    }
+  }
+  res.status(500).json({ error: error.message });
+});
+
+// Iniciar servidor
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Acesse: http://localhost:${PORT}`);
+});
+
