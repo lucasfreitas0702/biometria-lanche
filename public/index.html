@@ -13,13 +13,15 @@
       <p>Use sua biometria para entrar</p>
     </div>
 
-    <!-- Status da biometria -->
-    <div id="biometric-status" class="biometric-status"></div>
-
-    <!-- Resultado do login -->
     <div id="login-result" class="bottom-actions"></div>
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // Inicia login biométrico automaticamente
+    window.addEventListener("load", () => {
+      tryBiometricLogin();
+    });
+  </script>
 </body>
 </html>
