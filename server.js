@@ -1,7 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
-const base64url = require("base64url");
 const app = express();
 
 app.use(bodyParser.json());
@@ -12,21 +11,20 @@ const users = {};
 
 // Gerar desafio aleatório
 function generateChallenge() {
-  return crypto.randomBytes(32).toString("base64url");
+  return crypto.randomBytes(32);
 }
 
 // Opções para autenticação
 app.get("/auth-options", (req, res) => {
   const challenge = generateChallenge();
 
-  // Guardar temporariamente (em produção, vincular ao usuário real)
   users["defaultUser"] = users["defaultUser"] || {};
   users["defaultUser"].challenge = challenge;
 
   const options = {
-    challenge: Uint8Array.from(challenge, c => c.charCodeAt(0)),
+    challenge: challenge,
     timeout: 60000,
-    rpId: "localhost", // alterar conforme domínio real
+    rpId: "localhost", // altere para seu domínio real quando publicar
     allowCredentials: users["defaultUser"].credentials || [],
     userVerification: "preferred"
   };
