@@ -3,37 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login - Sistema de Biometria</title>
+  <title>Login Biométrico</title>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-  <!-- Tela de Login -->
   <div id="login-screen" class="screen active">
     <div class="header">
       <h1>Bem-vindo</h1>
-      <p>Use biometria ou senha numérica para entrar</p>
+      <p>Use sua biometria para entrar</p>
     </div>
 
-    <!-- Exibição dos pontos da senha -->
-    <div class="password-display">
-      <div id="password-dots"></div>
-    </div>
-
-    <!-- Teclado numérico -->
-    <div class="keypad">
-      <button class="key">1</button>
-      <button class="key">2</button>
-      <button class="key">3</button>
-      <button class="key">4</button>
-      <button class="key">5</button>
-      <button class="key">6</button>
-      <button class="key">7</button>
-      <button class="key">8</button>
-      <button class="key">9</button>
-      <button class="key clear">C</button>
-      <button class="key">0</button>
-      <button class="key enter">⏎</button>
-    </div>
+    <!-- Status da biometria -->
+    <div id="biometric-status" class="biometric-status"></div>
 
     <!-- Resultado do login -->
     <div id="login-result" class="bottom-actions"></div>
