@@ -1,33 +1,89 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Cadastro - Biometria QR</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Cadastro de Usuário</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #eaf6ff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    input {
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 18px;
+      width: 80%;
+      max-width: 300px;
+    }
+    button {
+      width: 80%;
+      max-width: 300px;
+      padding: 15px;
+      font-size: 18px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      background: #28a745;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1e7e34;
+    }
+  </style>
 </head>
 <body>
-  <div class="wrapper">
-    <div class="card">
-      <h2>Cadastrar nova pessoa</h2>
-      <form id="formCadastro" enctype="multipart/form-data">
-        <label>PIN numérico (único)</label>
-        <input name="pin" id="pin" placeholder="PIN" required inputmode="numeric">
+  <h1>Cadastrar Usuário</h1>
+  <input type="password" id="senha" placeholder="Digite uma senha numérica" />
 
-        <label>Imagem (obrigatório)</label>
-        <input type="file" name="imagem" id="imagem" accept="image/*" required>
+  <button onclick="registerBiometry()">Cadastrar Biometria + Senha</button>
+  <button onclick="window.location.href='/'">Voltar</button>
 
-        <button type="submit">Cadastrar e salvar</button>
-      </form>
+  <script>
+    async function registerBiometry() {
+      try {
+        const publicKey = {
+          challenge: new Uint8Array([1,2,3,4]),
+          rp: { name: "Meu App" },
+          user: {
+            id: new Uint8Array(16),
+            name: "usuario",
+            displayName: "Usuário"
+          },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+          authenticatorSelection: {
+            userVerification: "preferred"
+          },
+          timeout: 60000,
+          attestation: "direct"
+        };
 
-      <div style="margin-top:12px;">
-        <button id="activateBio" disabled>Ativar Biometria (após cadastro)</button>
-      </div>
+        const credential = await navigator.credentials.create({ publicKey });
 
-      <div id="cadMsg" class="msg"></div>
-    </div>
-  </div>
+        await fetch("/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential: { id: credential.id, type: credential.type } })
+        });
 
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+        alert("Usuário cadastrado com sucesso!");
+        window.location.href = "/";
+      } catch (err) {
+        console.error("Erro no cadastro:", err);
+        alert("Falha ao cadastrar biometria");
+      }
+    }
+  </script>
 </body>
 </html>
