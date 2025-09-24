@@ -22,7 +22,7 @@
     input {
       padding: 12px;
       margin: 10px 0;
-      font-size: 18px;
+      font-size: 16px;
       width: 80%;
       max-width: 300px;
     }
@@ -45,9 +45,10 @@
 </head>
 <body>
   <h1>Cadastrar Usuário</h1>
-  <input type="password" id="senha" placeholder="Digite uma senha numérica" />
+  
+  <input type="file" id="imagem" accept="image/*" required />
 
-  <button onclick="registerBiometry()">Cadastrar Biometria + Senha</button>
+  <button onclick="registerBiometry()">Cadastrar Biometria + Imagem</button>
   <button onclick="window.location.href='/'">Voltar</button>
 
   <script>
@@ -71,14 +72,29 @@
 
         const credential = await navigator.credentials.create({ publicKey });
 
-        await fetch("/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential: { id: credential.id, type: credential.type } })
-        });
+        const fileInput = document.getElementById("imagem");
+        if (!fileInput.files[0]) {
+          alert("Selecione uma imagem!");
+          return;
+        }
 
-        alert("Usuário cadastrado com sucesso!");
-        window.location.href = "/";
+        const reader = new FileReader();
+        reader.onload = async function() {
+          const imageData = reader.result;
+
+          await fetch("/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              credential: { id: credential.id, type: credential.type },
+              image: imageData
+            })
+          });
+
+          alert("Usuário cadastrado com sucesso!");
+          window.location.href = "/";
+        };
+        reader.readAsDataURL(fileInput.files[0]);
       } catch (err) {
         console.error("Erro no cadastro:", err);
         alert("Falha ao cadastrar biometria");
