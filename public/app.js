@@ -17,21 +17,101 @@ function base64urlToBuffer(base64url) {
 }
 
 // ===============================
+// Cadastro (Imagem + Biometria)
+// ===============================
+const imageInput = document.getElementById("image-input");
+const preview = document.getElementById("preview");
+const saveButton = document.getElementById("save-button");
+let biometricCredential = null;
+
+if (imageInput) {
+  imageInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        preview.src = ev.target.result;
+        preview.style.display = "block";
+      };
+      reader.readAsDataURL(file);
+    }
+    checkReadyToSave();
+  });
+}
+
+async function registerBiometric() {
+  try {
+    const resp = await fetch("/webauthn/register/options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: Date.now() }), // id fake só p/ exemplo
+    });
+    const data = await resp.json();
+    const publicKey = data.publicKey;
+
+    // Converter dados
+    publicKey.challenge = base64urlToBuffer(publicKey.challenge);
+    publicKey.user.id = base64urlToBuffer(publicKey.user.id);
+
+    const credential = await navigator.credentials.create({ publicKey });
+    biometricCredential = credential;
+    document.getElementById("biometric-status").innerText =
+      "Biometria registrada com sucesso ✅";
+    checkReadyToSave();
+  } catch (err) {
+    console.error("Erro no registro biométrico:", err);
+    document.getElementById("biometric-status").innerText =
+      "Erro ao registrar biometria ❌";
+  }
+}
+
+if (saveButton) {
+  saveButton.addEventListener("click", async () => {
+    if (!imageInput.files.length || !biometricCredential) return;
+
+    // montar dados p/ envio
+    const formData = new FormData();
+    formData.append("imagem", imageInput.files[0]);
+    formData.append("credentialId", bufferToBase64url(biometricCredential.rawId));
+    formData.append("publicKey", JSON.stringify(biometricCredential.response));
+
+    const resp = await fetch("/api/register", { method: "POST", body: formData });
+    const data = await resp.json();
+    if (data.success) {
+      alert("Usuário cadastrado com sucesso!");
+      window.location.href = "/";
+    } else {
+      alert("Erro no cadastro: " + data.error);
+    }
+  });
+}
+
+function checkReadyToSave() {
+  if (imageInput && imageInput.files.length && biometricCredential) {
+    saveButton.removeAttribute("disabled");
+  }
+}
+
+// dispara biometria logo no cadastro
+if (document.getElementById("register-screen")) {
+  registerBiometric();
+}
+
+// ===============================
 // Login Biométrico Automático
 // ===============================
 async function tryBiometricLogin() {
   if (!window.PublicKeyCredential) {
-    console.log("WebAuthn não suportado.");
+    document.getElementById("biometric-status").innerText =
+      "Seu navegador não suporta biometria.";
     return;
   }
 
   try {
-    // Obter opções do backend
     const resp = await fetch("/webauthn/auth/options");
     const data = await resp.json();
     const publicKey = data.publicKey;
 
-    // Converter challenge e credenciais
     publicKey.challenge = base64urlToBuffer(publicKey.challenge);
     if (publicKey.allowCredentials) {
       publicKey.allowCredentials = publicKey.allowCredentials.map(cred => ({
@@ -40,10 +120,8 @@ async function tryBiometricLogin() {
       }));
     }
 
-    // Dispara prompt biométrico automaticamente
     const assertion = await navigator.credentials.get({ publicKey });
 
-    // Serializar resultado para enviar ao backend
     const credential = {
       id: assertion.id,
       rawId: bufferToBase64url(assertion.rawId),
@@ -67,99 +145,27 @@ async function tryBiometricLogin() {
     const finishData = await finishResp.json();
 
     if (finishData.ok) {
-      console.log("Login biométrico bem-sucedido!");
-      mostrarUsuario(finishData);
+      document.getElementById("biometric-status").innerText =
+        "Login biométrico bem-sucedido ✅";
+      const result = document.getElementById("login-result");
+      if (result && finishData.imageUrl) {
+        result.innerHTML = `
+          <h3>Usuário autenticado!</h3>
+          <img src="${finishData.imageUrl}" alt="Imagem do usuário" class="preview-image" />
+        `;
+      }
     } else {
-      console.warn("Falha na biometria:", finishData.error);
+      document.getElementById("biometric-status").innerText =
+        "Falha na biometria ❌";
     }
   } catch (err) {
-    console.warn("Erro no login biométrico:", err);
+    console.error("Erro no login biométrico:", err);
+    document.getElementById("biometric-status").innerText =
+      "Erro ao autenticar ❌";
   }
 }
 
-// ===============================
-// Login por Senha Numérica
-// ===============================
-let loginPin = "";
-
-function updatePinDots() {
-  const dotsContainer = document.getElementById("password-dots");
-  if (!dotsContainer) return;
-  dotsContainer.innerHTML = "";
-  for (let i = 0; i < loginPin.length; i++) {
-    const dot = document.createElement("div");
-    dot.classList.add("password-dot");
-    dotsContainer.appendChild(dot);
-  }
+// dispara biometria logo no login
+if (document.getElementById("login-screen")) {
+  tryBiometricLogin();
 }
-
-function handleKeyPress(digit) {
-  if (loginPin.length < 10) {
-    loginPin += digit;
-    updatePinDots();
-  }
-}
-
-function handleClear() {
-  loginPin = "";
-  updatePinDots();
-}
-
-async function handleEnter() {
-  if (loginPin.length < 4) {
-    alert("Digite pelo menos 4 números.");
-    return;
-  }
-
-  try {
-    const resp = await fetch("/api/login_pin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin: loginPin }),
-    });
-
-    const data = await resp.json();
-    if (data.ok) {
-      console.log("Login por senha bem-sucedido!");
-      mostrarUsuario(data);
-    } else {
-      alert(data.error || "Falha no login.");
-      handleClear();
-    }
-  } catch (err) {
-    console.error("Erro no login por senha:", err);
-  }
-}
-
-// ===============================
-// UI Helper
-// ===============================
-function mostrarUsuario(data) {
-  const container = document.getElementById("login-result");
-  if (container && data.imageUrl) {
-    container.innerHTML = `
-      <h3>Usuário autenticado!</h3>
-      <img src="${data.imageUrl}" alt="Imagem do usuário" class="preview-image" />
-    `;
-  }
-}
-
-// ===============================
-// Eventos
-// ===============================
-
-// Ativa biometria automática ao carregar
-window.addEventListener("load", tryBiometricLogin);
-
-// Liga teclas do teclado numérico
-document.querySelectorAll("#login-screen .key").forEach(btn => {
-  btn.addEventListener("click", () => {
-    if (btn.classList.contains("clear")) {
-      handleClear();
-    } else if (btn.classList.contains("enter")) {
-      handleEnter();
-    } else {
-      handleKeyPress(btn.textContent.trim());
-    }
-  });
-});
