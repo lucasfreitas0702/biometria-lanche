@@ -14,10 +14,11 @@
       margin: 0;
       background: #f0f0f0;
       font-family: Arial, sans-serif;
-      overflow: hidden; /* impede rolagem */
+      overflow: hidden;
     }
     h1 {
-      margin-bottom: 40px;
+      margin-bottom: 30px;
+      text-align: center;
     }
     button {
       width: 80%;
@@ -34,16 +35,21 @@
     button:hover {
       background: #0056b3;
     }
+    #qrImage {
+      display: none;
+      max-width: 80%;
+      max-height: 60%;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
-  <h1>Digite sua senha ou acesse a biometria</h1>
+  <h1>Toque no botão para usar a biometria</h1>
   
-  <!-- Botão de login com biometria -->
   <button onclick="startAuth()">Entrar com Biometria</button>
-
-  <!-- Botão para abrir tela de cadastro -->
   <button onclick="window.location.href='/cadastro.html'">Cadastrar Usuário</button>
+
+  <img id="qrImage" src="" alt="Imagem do usuário" />
 
   <script>
     async function startAuth() {
@@ -62,7 +68,7 @@
 
         const credential = await navigator.credentials.get({ publicKey: options });
 
-        await fetch("/auth-verify", {
+        const verifyRes = await fetch("/auth-verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -71,7 +77,18 @@
           })
         });
 
-        alert("Login realizado com sucesso!");
+        const data = await verifyRes.json();
+        if (data.success && data.image) {
+          const qr = document.getElementById("qrImage");
+          qr.src = data.image;
+          qr.style.display = "block";
+
+          setTimeout(() => {
+            qr.style.display = "none";
+          }, 4000);
+        } else {
+          alert("Usuário não encontrado ou falha na autenticação.");
+        }
       } catch (err) {
         console.error("Erro:", err);
         alert("Falha na autenticação");
