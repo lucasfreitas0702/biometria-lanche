@@ -9,26 +9,26 @@
 <body>
   <div id="register-screen" class="screen active">
     <div class="header">
-      <h1>Cadastro</h1>
-      <p>Envie uma foto e registre sua biometria</p>
+      <h1>Cadastro de Usuário</h1>
+      <p>Envie uma imagem e registre sua biometria</p>
     </div>
 
-    <!-- Upload de imagem -->
-    <div class="image-upload">
-      <input type="file" id="image-input" accept="image/*" />
-      <div class="upload-area">
-        <span class="upload-icon">📷</span>
-        <span class="upload-text">Clique para escolher uma imagem</span>
+    <form id="register-form">
+      <div class="form-group">
+        <label for="image-input">Imagem:</label>
+        <input type="file" id="image-input" name="imagem" accept="image/*" required />
       </div>
-      <div class="image-preview">
-        <img id="preview" class="preview-image" style="display:none;" />
-      </div>
-    </div>
 
-    <!-- Status da biometria -->
-    <div id="biometric-status" class="biometric-status"></div>
+      <button type="button" class="biometric-button" onclick="registerBiometric()">
+        Cadastrar Biometria
+      </button>
 
-    <button id="save-button" class="save-button" disabled>Salvar Usuário</button>
+      <div id="register-status" class="biometric-status"></div>
+
+      <button type="submit" class="save-button" disabled id="save-user">
+        Salvar Usuário
+      </button>
+    </form>
   </div>
 
   <script src="app.js"></script>
