@@ -1,92 +1,82 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>Autenticação Biométrica</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f4f4f9;
-        }
-        .container {
-            text-align: center;
-        }
-        #startButton {
-            font-size: 22px;
-            padding: 20px 40px;
-            border: none;
-            border-radius: 12px;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        #startButton:hover {
-            background-color: #0056b3;
-        }
-        #userImage {
-            display: none;
-            margin-top: 20px;
-            max-width: 300px;
-            border-radius: 12px;
-            box-shadow: 0 0 12px rgba(0,0,0,0.3);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Login Biométrico</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f0f0f0;
+      font-family: Arial, sans-serif;
+      overflow: hidden; /* impede rolagem */
+    }
+    h1 {
+      margin-bottom: 40px;
+    }
+    button {
+      width: 80%;
+      max-width: 300px;
+      padding: 20px;
+      font-size: 20px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <button id="startButton">Acessar com biometria</button>
-        <img id="userImage" src="" alt="Imagem do usuário">
-    </div>
+  <h1>Digite sua senha ou acesse a biometria</h1>
+  
+  <!-- Botão de login com biometria -->
+  <button onclick="startAuth()">Entrar com Biometria</button>
 
-    <script>
-        const startButton = document.getElementById('startButton');
-        const userImage = document.getElementById('userImage');
+  <!-- Botão para abrir tela de cadastro -->
+  <button onclick="window.location.href='/cadastro.html'">Cadastrar Usuário</button>
 
-        startButton.addEventListener('click', async () => {
-            try {
-                // Aqui sim o navegador permite o uso do WebAuthn
-                const credential = await navigator.credentials.get({
-                    publicKey: {
-                        challenge: new Uint8Array([ // exemplo simples
-                            0x8C, 0xFA, 0x33, 0xF1
-                        ]),
-                        timeout: 60000,
-                        userVerification: "required"
-                    }
-                });
+  <script>
+    async function startAuth() {
+      try {
+        const optionsRes = await fetch("/auth-options");
+        const options = await optionsRes.json();
 
-                // Se chegou aqui, a biometria foi validada
-                console.log("Credencial recebida:", credential);
+        options.challenge = new Uint8Array(options.challenge.data);
 
-                // Buscar imagem do usuário autenticado
-                fetch("/get_user_image")
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.image_url) {
-                            userImage.src = data.image_url;
-                            userImage.style.display = "block";
+        if (options.allowCredentials) {
+          options.allowCredentials = options.allowCredentials.map(c => ({
+            ...c,
+            id: new Uint8Array(c.id.data)
+          }));
+        }
 
-                            startButton.style.display = "none";
+        const credential = await navigator.credentials.get({ publicKey: options });
 
-                            // Volta para o botão após 4 segundos
-                            setTimeout(() => {
-                                userImage.style.display = "none";
-                                startButton.style.display = "inline-block";
-                            }, 4000);
-                        }
-                    });
-
-            } catch (err) {
-                console.error("Erro na autenticação:", err);
-                alert("Falha na leitura biométrica. Tente novamente.");
-            }
+        await fetch("/auth-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: credential.id,
+            type: credential.type
+          })
         });
-    </script>
+
+        alert("Login realizado com sucesso!");
+      } catch (err) {
+        console.error("Erro:", err);
+        alert("Falha na autenticação");
+      }
+    }
+  </script>
 </body>
 </html>
