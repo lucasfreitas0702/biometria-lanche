@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cadastro - Biometria QR</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <h2>Cadastrar nova pessoa</h2>
+      <form id="formCadastro" enctype="multipart/form-data">
+        <label>PIN numérico (único)</label>
+        <input name="pin" id="pin" placeholder="PIN" required inputmode="numeric">
+
+        <label>Imagem (obrigatório)</label>
+        <input type="file" name="imagem" id="imagem" accept="image/*" required>
+
+        <button type="submit">Cadastrar e salvar</button>
+      </form>
+
+      <div style="margin-top:12px;">
+        <button id="activateBio" disabled>Ativar Biometria (após cadastro)</button>
+      </div>
+
+      <div id="cadMsg" class="msg"></div>
+    </div>
+  </div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
