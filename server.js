@@ -51,7 +51,7 @@ db.serialize(() => {
 });
 
 // Configuração WebAuthn
-const RP_ID = process.env.RP_ID || "biometria-lanche-23.onrender.com";
+const RP_ID = process.env.RP_ID || "biometria-lanche-24.onrender.com";
 const ORIGIN =
   process.env.ORIGIN || "https://biometria-lanche-17.onrender.com";
 
