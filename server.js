@@ -1,226 +1,75 @@
-import express from "express";
-import session from "express-session";
-import sqlite3 from "sqlite3";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { Fido2Lib } from "fido2-lib";
-import base64url from "base64url";
+const express = require("express");
+const bodyParser = require("body-parser");
+const base64url = require("base64url");
+const crypto = require("crypto");
+const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, "public"))); // serve index.html
 
-// Diretório base
-const __dirname = path.resolve();
+// Armazenamento simples em memória (depois pode trocar por DB)
+let users = {}; // { username: { id, credentials, image } }
 
-// Pasta de uploads
-const uploadDir = path.join(__dirname, "public", "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// Utilitário para gerar desafios
+function generateChallenge() {
+  return base64url(crypto.randomBytes(32));
+}
 
-// Upload de imagens
-const storage = multer.diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => cb(null, Date.now() + "_" + file.originalname),
-});
-const upload = multer({ storage });
+// Rota de opções de cadastro
+app.post("/register-options", (req, res) => {
+  const { username, image } = req.body;
 
-// Sessões
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "segredo",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+  if (!username || !image) {
+    return res.status(400).json({ error: "Nome de usuário e imagem são obrigatórios." });
+  }
 
-app.use(express.json());
-app.use(express.static("public"));
+  const userId = base64url(crypto.randomBytes(16));
 
-// Banco SQLite (simples, sem "sqlite" pacote extra)
-const db = new sqlite3.Database("./database.db");
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS pessoas (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      credential_id TEXT UNIQUE,
-      public_key BLOB,
-      sign_count INTEGER DEFAULT 0,
-      imagem TEXT NOT NULL
-    )
-  `);
-});
-
-// Configuração WebAuthn
-const RP_ID = process.env.RP_ID || "biometria-lanche-24.onrender.com";
-const ORIGIN =
-  process.env.ORIGIN || "https://biometria-lanche-17.onrender.com";
-
-const fido = new Fido2Lib({
-  timeout: 60000,
-  rpId: RP_ID,
-  rpName: "Biometria App",
-  challengeSize: 64,
-  attestation: "none",
-  authenticatorSelection: { userVerification: "discouraged" },
-});
-
-// ---------------- ROTAS ----------------
-
-// Cadastro (imagem primeiro)
-app.post("/api/cadastro", upload.single("imagem"), (req, res) => {
-  if (!req.file) return res.json({ ok: false, error: "Imagem obrigatória" });
-  db.run(
-    "INSERT INTO pessoas (imagem) VALUES (?)",
-    req.file.filename,
-    function (err) {
-      if (err) return res.json({ ok: false, error: err.message });
-      res.json({ ok: true, id: this.lastID });
-    }
-  );
-});
-
-// Início registro
-app.post("/webauthn/register/options", async (req, res) => {
-  const { id } = req.body;
-  if (!id) return res.json({ error: "id obrigatório" });
-
-  const user = {
-    id: Buffer.from(String(id)),
-    name: String(id),
-    displayName: "Usuário " + id,
+  users[username] = {
+    id: userId,
+    image: image,
+    credentials: []
   };
 
-  const opts = await fido.attestationOptions();
-  opts.user = user;
-  opts.rp.id = RP_ID;
+  const options = {
+    challenge: generateChallenge(),
+    rp: { name: "Biometria Lanche", id: req.hostname },
+    user: {
+      id: Buffer.from(userId),
+      name: username,
+      displayName: username,
+    },
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+    timeout: 60000,
+    attestation: "direct",
+  };
 
-  req.session.registerOpts = opts;
-  req.session.userId = id;
-
-  res.json({ publicKey: opts });
+  res.json(options);
 });
 
-// Final registro
-app.post("/webauthn/register/finish", async (req, res) => {
-  try {
-    const { id, att } = req.body;
-    const state = req.session.registerOpts;
-    if (!state) return res.json({ error: "state inválido" });
+// Rota de opções de autenticação
+app.get("/auth-options", (req, res) => {
+  const options = {
+    challenge: generateChallenge(),
+    timeout: 60000,
+    rpId: req.hostname,
+    allowCredentials: [],
+    userVerification: "preferred",
+  };
 
-    const attRes = {
-      rawId: Buffer.from(att.rawId, "base64url"),
-      response: {
-        attestationObject: Buffer.from(
-          att.response.attestationObject,
-          "base64url"
-        ),
-        clientDataJSON: Buffer.from(att.response.clientDataJSON, "base64url"),
-      },
-    };
-
-    const reg = await fido.attestationResult(attRes, state);
-
-    const credId = att.rawId;
-    const pubKey = reg.authnrData.get("credentialPublicKeyPem");
-    const signCount = reg.authnrData.get("signCount");
-
-    db.run(
-      "UPDATE pessoas SET credential_id=?, public_key=?, sign_count=? WHERE id=?",
-      [credId, pubKey, signCount, id],
-      (err) => {
-        if (err) return res.json({ ok: false, error: err.message });
-        delete req.session.registerOpts;
-        res.json({ ok: true });
-      }
-    );
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: "Falha no registro" });
-  }
+  res.json(options);
 });
 
-// Início autenticação
-app.get("/webauthn/auth/options", async (req, res) => {
-  db.all(
-    "SELECT credential_id FROM pessoas WHERE credential_id IS NOT NULL",
-    async (err, rows) => {
-      if (err) return res.json({ error: err.message });
-      if (rows.length === 0)
-        return res.json({ error: "Nenhuma credencial cadastrada" });
-
-      const allowCredentials = rows.map((r) => ({
-        type: "public-key",
-        id: r.credential_id,
-      }));
-
-      const opts = await fido.assertionOptions();
-      opts.allowCredentials = allowCredentials;
-      opts.rpId = RP_ID;
-
-      req.session.authOpts = opts;
-      res.json({ publicKey: opts });
-    }
-  );
+// Rota de verificação de autenticação
+app.post("/verify-auth", (req, res) => {
+  // Aqui você trataria a resposta real do navegador
+  // Por enquanto vamos só simular o sucesso
+  res.json({ success: true, image: "IMAGEM_DO_USUARIO" });
 });
 
-// Final autenticação
-app.post("/webauthn/auth/finish", async (req, res) => {
-  try {
-    const { assertion } = req.body;
-    const state = req.session.authOpts;
-    if (!state) return res.json({ error: "state inválido" });
-
-    const credId = assertion.rawId;
-
-    db.get(
-      "SELECT * FROM pessoas WHERE credential_id=?",
-      credId,
-      async (err, row) => {
-        if (err) return res.json({ ok: false, error: err.message });
-        if (!row)
-          return res.json({ ok: false, error: "Credencial não encontrada" });
-
-        const assRes = {
-          rawId: Buffer.from(assertion.rawId, "base64url"),
-          response: {
-            authenticatorData: Buffer.from(
-              assertion.response.authenticatorData,
-              "base64url"
-            ),
-            clientDataJSON: Buffer.from(
-              assertion.response.clientDataJSON,
-              "base64url"
-            ),
-            signature: Buffer.from(assertion.response.signature, "base64url"),
-            userHandle: assertion.response.userHandle
-              ? Buffer.from(assertion.response.userHandle, "base64url")
-              : null,
-          },
-        };
-
-        const result = await fido.assertionResult(assRes, state, {
-          credentialPublicKey: row.public_key,
-          counter: row.sign_count,
-        });
-
-        const newCount = result.authnrData.get("signCount");
-        db.run(
-          "UPDATE pessoas SET sign_count=? WHERE id=?",
-          [newCount, row.id],
-          () => {
-            res.json({ ok: true, imageUrl: "/uploads/" + row.imagem });
-          }
-        );
-      }
-    );
-  } catch (err) {
-    console.error(err);
-    res.json({ ok: false, error: "Falha na autenticação" });
-  }
-});
-
-// ------------------------------
-
+// Inicialização
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("Servidor rodando na porta " + PORT);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
