@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Login Biométrico</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f0f0f0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    h1 {
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    button {
+      width: 80%;
+      max-width: 300px;
+      padding: 20px;
+      font-size: 20px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    #qrImage {
+      display: none;
+      max-width: 80%;
+      max-height: 60%;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Toque no botão para usar a biometria</h1>
+  
+  <button onclick="startAuth()">Entrar com Biometria</button>
+  <button onclick="window.location.href='/cadastro.html'">Cadastrar Usuário</button>
+
+  <img id="qrImage" src="" alt="Imagem do usuário" />
+
+  <script>
+    async function startAuth() {
+      try {
+        const optionsRes = await fetch("/auth-options");
+        const options = await optionsRes.json();
+
+        options.challenge = new Uint8Array(options.challenge.data);
+
+        if (options.allowCredentials) {
+          options.allowCredentials = options.allowCredentials.map(c => ({
+            ...c,
+            id: new Uint8Array(c.id.data)
+          }));
+        }
+
+        const credential = await navigator.credentials.get({ publicKey: options });
+
+        const verifyRes = await fetch("/auth-verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: credential.id,
+            type: credential.type
+          })
+        });
+
+        const data = await verifyRes.json();
+        if (data.success && data.image) {
+          const qr = document.getElementById("qrImage");
+          qr.src = data.image;
+          qr.style.display = "block";
+
+          setTimeout(() => {
+            qr.style.display = "none";
+          }, 4000);
+        } else {
+          alert("Usuário não encontrado ou falha na autenticação.");
+        }
+      } catch (err) {
+        console.error("Erro:", err);
+        alert("Falha na autenticação");
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Cadastro de Usuário</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #eaf6ff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    input {
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 16px;
+      width: 80%;
+      max-width: 300px;
+    }
+    button {
+      width: 80%;
+      max-width: 300px;
+      padding: 15px;
+      font-size: 18px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      background: #28a745;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1e7e34;
+    }
+  </style>
+</head>
+<body>
+  <h1>Cadastrar Usuário</h1>
+  
+  <input type="file" id="imagem" accept="image/*" required />
+
+  <button onclick="registerBiometry()">Cadastrar Biometria + Imagem</button>
+  <button onclick="window.location.href='/'">Voltar</button>
+
+  <script>
+    async function registerBiometry() {
+      try {
+        const publicKey = {
+          challenge: new Uint8Array([1,2,3,4]),
+          rp: { name: "Meu App" },
+          user: {
+            id: new Uint8Array(16),
+            name: "usuario",
+            displayName: "Usuário"
+          },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+          authenticatorSelection: {
+            userVerification: "preferred"
+          },
+          timeout: 60000,
+          attestation: "direct"
+        };
+
+        const credential = await navigator.credentials.create({ publicKey });
+
+        const fileInput = document.getElementById("imagem");
+        if (!fileInput.files[0]) {
+          alert("Selecione uma imagem!");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function() {
+          const imageData = reader.result;
+
+          await fetch("/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              credential: { id: credential.id, type: credential.type },
+              image: imageData
+            })
+          });
+
+          alert("Usuário cadastrado com sucesso!");
+          window.location.href = "/";
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      } catch (err) {
+        console.error("Erro no cadastro:", err);
+        alert("Falha ao cadastrar biometria");
+      }
+    }
+  </script>
+</body>
+</html>
