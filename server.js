@@ -1,74 +1,79 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const bodyParser = require("body-parser");
+const base64url = require("base64url");
 
 const app = express();
-const PORT = 3000;
+app.use(express.json());
+app.use(express.static("public"));
 
-// pasta de dados (salva os cadastros)
+// Arquivo onde salvamos os usuários
 const USERS_FILE = path.join(__dirname, "users.json");
 
-// se não existir, cria o arquivo de usuários
+// Garante que o arquivo existe
 if (!fs.existsSync(USERS_FILE)) {
   fs.writeFileSync(USERS_FILE, "[]");
 }
 
-app.use(bodyParser.json({ limit: "10mb" })); // permite imagens base64 grandes
-app.use(express.static("public"));
+// ---------------- ROTAS ----------------
 
-// rota para registrar novo usuário
+// Página inicial
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Cadastro de usuário
 app.post("/register", (req, res) => {
-  const { credential, image } = req.body;
+  const { id, image } = req.body;
+  const users = JSON.parse(fs.readFileSync(USERS_FILE));
 
-  if (!credential || !image) {
-    return res.status(400).json({ success: false, message: "Dados incompletos" });
+  if (users.find((u) => u.id === id)) {
+    return res.status(400).json({ error: "Usuário já cadastrado" });
   }
 
-  const users = JSON.parse(fs.readFileSync(USERS_FILE));
-  users.push({
-    id: credential.id,
-    type: credential.type,
-    image: image // base64 da imagem
-  });
-
+  users.push({ id, image });
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-
   res.json({ success: true });
 });
 
-// rota que retorna opções para autenticação
+// Opções para autenticação biométrica
 app.get("/auth-options", (req, res) => {
   const users = JSON.parse(fs.readFileSync(USERS_FILE));
 
   const options = {
     challenge: new Uint8Array([1, 2, 3, 4]),
     timeout: 60000,
-    rpId: "localhost",
-    allowCredentials: users.map(u => ({
+    rpId: req.hostname, // ✅ Agora se ajusta ao domínio automaticamente
+    allowCredentials: users.map((u) => ({
       id: new Uint8Array(Buffer.from(u.id, "utf-8")),
-      type: "public-key"
+      type: "public-key",
     })),
-    userVerification: "preferred"
+    userVerification: "preferred",
   };
 
   res.json(options);
 });
 
-// rota para verificar a biometria e retornar a imagem
-app.post("/auth-verify", (req, res) => {
-  const { id } = req.body;
-  const users = JSON.parse(fs.readFileSync(USERS_FILE));
+// Verificação da autenticação
+app.post("/verify-auth", (req, res) => {
+  // Aqui no exemplo só validamos que veio algum dado
+  if (!req.body || !req.body.id) {
+    return res.status(400).json({ success: false, error: "Dados inválidos" });
+  }
 
-  const user = users.find(u => u.id === id);
+  // Retorna a imagem do usuário autenticado
+  const users = JSON.parse(fs.readFileSync(USERS_FILE));
+  const user = users.find((u) => u.id === req.body.id);
 
   if (!user) {
-    return res.json({ success: false, message: "Usuário não encontrado" });
+    return res.status(404).json({ success: false, error: "Usuário não encontrado" });
   }
 
   res.json({ success: true, image: user.image });
 });
 
+// ---------------- INICIALIZAÇÃO ----------------
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
